@@ -139,7 +139,7 @@ place_xy = forward_kinematics(place)
 
 # Final error
 final_error = np.linalg.norm(forward_kinematics(q[-1, :]) - place_xy)
-print(f"Final end-effector error at place: {final_error:.4f}")
+print(f"Final end-effector error: {final_error:.4f}")
 
 
 ## Plots
