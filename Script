@@ -2,56 +2,50 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
 
-# -----------------------
-# Robot & task parameters
-# -----------------------
+
+##Parameters
 L1 = 0.5  # m
 L2 = 0.3  # m
 
-# Joint limits (degrees, for reference only)
+# Joint limits
 joint_min_deg = -90
 joint_max_deg = 90
 
-# Configurations in degrees
-home_deg  = np.array([0.0,   0.0])
-pick_deg  = np.array([30.0, -20.0])
+# Pick-and-Place Configuration
+home_deg = np.array([0.0,   0.0])
+pick_deg = np.array([30.0, -20.0])
 place_deg = np.array([45.0, -30.0])
 
 # Convert to radians
-home  = np.deg2rad(home_deg)
-pick  = np.deg2rad(pick_deg)
+home = np.deg2rad(home_deg)
+pick = np.deg2rad(pick_deg)
 place = np.deg2rad(place_deg)
 
-# -----------------------
-# Simple joint-space PD controller
-# -----------------------
-# Controller design:
-# - Very simple: tau = Kp*(q_d - q) + Kd*(dq_d - dq)
-# - Interprets each joint as a unit-inertia 2nd-order system.
-# - Gains chosen so that the robot tracks smoothly with small overshoot
-#   and final end-effector error < 1 cm at the final configuration.
+
+## Joint-space PD controller
+# f = Kp*(q_d - q) + Kd*(dq_d - dq)
 Kp = np.array([50.0, 50.0])
 Kd = np.array([10.0, 10.0])
 
-# -----------------------
-# Trajectory parameters
-# -----------------------
-T1 = 2.0   # s, home -> pick
-Th1 = 1.0  # s, hold at pick
-T2 = 2.0   # s, pick -> place
-Th2 = 1.0  # s, hold at place
+
+## Trajectory parameters
+T1 = 2.0   # home to pick
+Th1 = 1.0  # hold at pick
+T2 = 2.0   # pick to place
+Th2 = 1.0  # hold at place
 
 T_total = T1 + Th1 + T2 + Th2
 
-dt = 0.01  # time step for simulation
+
+## Simulation parameters
+dt = 0.01 
 N = int(T_total / dt) + 1
 time = np.linspace(0, T_total, N)
 
-# -----------------------
-# Helper functions
-# -----------------------
+
+## Functions
 def forward_kinematics(q):
-    """Return end-effector (x, y) for joint angles q = [q1, q2]."""
+    # Returns end-effector position for joint angles
     q1, q2 = q
     x1 = L1 * np.cos(q1)
     y1 = L1 * np.sin(q1)
@@ -59,18 +53,14 @@ def forward_kinematics(q):
     y2 = y1 + L2 * np.sin(q1 + q2)
     return np.array([x2, y2])
 
-def cubic_interpolation(q0, qf, T, tau):
-    """
-    Cubic polynomial with zero velocity at start and end.
-    q0, qf: 2D joint vectors
-    T: segment duration
-    tau: local time in [0, T]
-    Returns q_d, dq_d.
-    """
+def velocity_control(q0, qf, T, f):
+    # Used cubic polynomial with zero velocity at start and end
+    # Returns q_d, dq_d
+
     if T <= 0:
         return qf, np.zeros_like(qf)
 
-    s = tau / T
+    s = f / T
     s2 = s * s
     s3 = s2 * s
     # Position
@@ -80,34 +70,27 @@ def cubic_interpolation(q0, qf, T, tau):
     return qd, dqd
 
 def desired_trajectory(t):
-    """
-    Piecewise trajectory:
-    0 ---- T1         : home -> pick (cubic)
-    T1 --- T1+Th1     : hold at pick
-    T1+Th1 --- T1+Th1+T2 : pick -> place (cubic)
-    rest              : hold at place
-    """
+    # Time schedule for the whole pick-and-place task
+
     if t < 0:
         return home, np.zeros(2)
 
     if t < T1:
-        tau = t
-        return cubic_interpolation(home, pick, T1, tau)
+        f = t
+        return velocity_control(home, pick, T1, f)
 
     if t < T1 + Th1:
         return pick, np.zeros(2)
 
     if t < T1 + Th1 + T2:
-        tau = t - (T1 + Th1)
-        return cubic_interpolation(pick, place, T2, tau)
+        f = t - (T1 + Th1)
+        return velocity_control(pick, place, T2, f)
 
-    # final hold
     return place, np.zeros(2)
 
-# -----------------------
-# Simulation
-# -----------------------
-q  = np.zeros((N, 2))
+
+## Simulation
+q = np.zeros((N, 2))
 dq = np.zeros((N, 2))
 qd = np.zeros((N, 2))
 dqd = np.zeros((N, 2))
@@ -120,24 +103,22 @@ for i in range(N - 1):
     t = time[i]
     qd[i, :], dqd[i, :] = desired_trajectory(t)
 
-    # PD control torque
-    e = qd[i, :] - q[i, :]
-    de = dqd[i, :] - dq[i, :]
-    tau = Kp * e + Kd * de
+    # PD control
+    e = qd[i, :] - q[i, :] # position error
+    de = dqd[i, :] - dq[i, :] # velocity error
+    f = Kp * e + Kd * de
 
-    # Simple joint dynamics: ddq = tau (unit inertia, no coupling/gravity)
-    ddq = tau
+    # No gravity for simplicity
+    ddq = f
 
-    # Integrate (semi-implicit Euler)
+    # Integrate
     dq[i + 1, :] = dq[i, :] + ddq * dt
-    q[i + 1, :]  = q[i, :]  + dq[i + 1, :] * dt
+    q[i + 1, :] = q[i, :] + dq[i + 1, :] * dt
 
-# also compute desired at final step
+# Compute at final step
 qd[-1, :], dqd[-1, :] = desired_trajectory(time[-1])
 
-# -----------------------
 # End-effector trajectories
-# -----------------------
 x = np.zeros(N)
 y = np.zeros(N)
 xd = np.zeros(N)
@@ -147,23 +128,22 @@ for i in range(N):
     x[i], y[i] = forward_kinematics(q[i, :])
     xd[i], yd[i] = forward_kinematics(qd[i, :])
 
-# Pick and Place points (for plotting/animation)
-pick_xy  = forward_kinematics(pick)
+# Pick and Place points
+pick_xy = forward_kinematics(pick)
 place_xy = forward_kinematics(place)
 
-# Print final error to justify controller
+# Final error
 final_error = np.linalg.norm(forward_kinematics(q[-1, :]) - place_xy)
-print(f"Final end-effector error at Place (m): {final_error:.4f}")
+print(f"Final end-effector error at place: {final_error:.4f}")
 
-# -----------------------
-# Plots: End-effector performance
-# -----------------------
+
+## Plots
 plt.figure(figsize=(10, 4))
 
 # x(t)
 plt.subplot(1, 2, 1)
-plt.plot(time, x, label='x (actual)')
-plt.plot(time, xd, '--', label='x (desired)')
+plt.plot(time, x, label='x actual')
+plt.plot(time, xd, '--', label='x desired')
 plt.axhline(pick_xy[0], color='gray', linestyle=':', label='Pick x')
 plt.axhline(place_xy[0], color='black', linestyle=':', label='Place x')
 plt.xlabel('Time [s]')
@@ -173,8 +153,8 @@ plt.legend()
 
 # y(t)
 plt.subplot(1, 2, 2)
-plt.plot(time, y, label='y (actual)')
-plt.plot(time, yd, '--', label='y (desired)')
+plt.plot(time, y, label='y actual')
+plt.plot(time, yd, '--', label='y desired')
 plt.axhline(pick_xy[1], color='gray', linestyle=':', label='Pick y')
 plt.axhline(place_xy[1], color='black', linestyle=':', label='Place y')
 plt.xlabel('Time [s]')
@@ -185,10 +165,9 @@ plt.legend()
 plt.tight_layout()
 plt.show()
 
-# -----------------------
-# Animation
-# -----------------------
-# Precompute link positions
+
+## Animation
+# Compute link positions
 x0 = np.zeros(N)
 y0 = np.zeros(N)
 x1 = L1 * np.cos(q[:, 0])
@@ -199,11 +178,11 @@ y2 = y
 fig, ax = plt.subplots()
 ax.set_aspect('equal', 'box')
 
-# Set limits so all motion is visible
+# Set limits
 max_reach = L1 + L2 + 0.1
 ax.set_xlim(-max_reach, max_reach)
 ax.set_ylim(-max_reach, max_reach)
-ax.set_title("2-Link Pick-and-Place (Home → Pick → Place)")
+ax.set_title("2-Link Pick-and-Place")
 
 # Plot static pick/place point masses
 ax.scatter(pick_xy[0], pick_xy[1], s=80, c='red', label='Pick target')
@@ -224,10 +203,10 @@ def update(frame):
     link_line.set_data(xs, ys)
     return link_line,
 
-# Use every k-th simulation step for animation speed
+# Animation speed
 step = 5
 frames = range(0, N, step)
-interval_ms = dt * step * 1000  # roughly real-time
+interval_ms = dt * step * 1000
 
 ani = FuncAnimation(fig, update, frames=frames, init_func=init,
                     blit=True, interval=interval_ms)
