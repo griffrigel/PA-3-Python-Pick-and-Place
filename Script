@@ -22,7 +22,7 @@ pick = np.deg2rad(pick_deg)
 place = np.deg2rad(place_deg)
 
 
-## Joint-space PD controller
+## PD controller
 # f = Kp*(q_d - q) + Kd*(dq_d - dq)
 Kp = np.array([50.0, 50.0])
 Kd = np.array([10.0, 10.0])
