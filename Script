@@ -4,8 +4,8 @@ from matplotlib.animation import FuncAnimation
 
 
 ##Parameters
-L1 = 0.5  # m
-L2 = 0.3  # m
+L1 = 0.5
+L2 = 0.3
 
 # Joint limits
 joint_min_deg = -90
@@ -51,10 +51,11 @@ def forward_kinematics(q):
     y1 = L1 * np.sin(q1)
     x2 = x1 + L2 * np.cos(q1 + q2)
     y2 = y1 + L2 * np.sin(q1 + q2)
+
     return np.array([x2, y2])
 
 def velocity_control(q0, qf, T, f):
-    # Used cubic polynomial with zero velocity at start and end
+    # Used cubic polynomial with zero velocity at start and end - found this method online
     # Returns q_d, dq_d
 
     if T <= 0:
@@ -63,10 +64,13 @@ def velocity_control(q0, qf, T, f):
     s = f / T
     s2 = s * s
     s3 = s2 * s
+
     # Position
     qd = q0 + (3 * s2 - 2 * s3) * (qf - q0)
+    
     # Velocity
     dqd = (6 * s - 6 * s2) * (qf - q0) / T
+
     return qd, dqd
 
 def desired_trajectory(t):
@@ -99,6 +103,7 @@ dqd = np.zeros((N, 2))
 q[0, :] = home
 dq[0, :] = 0.0
 
+# Time step
 for i in range(N - 1):
     t = time[i]
     qd[i, :], dqd[i, :] = desired_trajectory(t)
@@ -146,8 +151,8 @@ plt.plot(time, x, label='x actual')
 plt.plot(time, xd, '--', label='x desired')
 plt.axhline(pick_xy[0], color='gray', linestyle=':', label='Pick x')
 plt.axhline(place_xy[0], color='black', linestyle=':', label='Place x')
-plt.xlabel('Time [s]')
-plt.ylabel('x [m]')
+plt.xlabel('Time')
+plt.ylabel('x')
 plt.title('End-Effector X Tracking')
 plt.legend()
 
@@ -157,16 +162,15 @@ plt.plot(time, y, label='y actual')
 plt.plot(time, yd, '--', label='y desired')
 plt.axhline(pick_xy[1], color='gray', linestyle=':', label='Pick y')
 plt.axhline(place_xy[1], color='black', linestyle=':', label='Place y')
-plt.xlabel('Time [s]')
-plt.ylabel('y [m]')
+plt.xlabel('Time')
+plt.ylabel('y')
 plt.title('End-Effector Y Tracking')
 plt.legend()
 
 plt.tight_layout()
-plt.show()
 
 
-## Animation
+## Animation - Used parts of PA0 for animation code
 # Compute link positions
 x0 = np.zeros(N)
 y0 = np.zeros(N)
@@ -175,6 +179,7 @@ y1 = L1 * np.sin(q[:, 0])
 x2 = x
 y2 = y
 
+# figure setup
 fig, ax = plt.subplots()
 ax.set_aspect('equal', 'box')
 
@@ -184,17 +189,21 @@ ax.set_xlim(-max_reach, max_reach)
 ax.set_ylim(-max_reach, max_reach)
 ax.set_title("2-Link Pick-and-Place")
 
-# Plot static pick/place point masses
+# Plot points for pick and place 
 ax.scatter(pick_xy[0], pick_xy[1], s=80, c='red', label='Pick target')
 ax.scatter(place_xy[0], place_xy[1], s=80, c='green', label='Place target')
 
-link_line, = ax.plot([], [], '-o', lw=3)  # robot links and joints
+# robot links and joints
+link_line, = ax.plot([], [], '-o', lw=3)
 ax.legend(loc='upper right')
 
+## Animation functions
+# Initialize function
 def init():
     link_line.set_data([], [])
     return link_line,
 
+# Update function
 def update(frame):
     # frame index
     i = frame
@@ -203,11 +212,12 @@ def update(frame):
     link_line.set_data(xs, ys)
     return link_line,
 
-# Animation speed
+# Animation speed 
 step = 5
 frames = range(0, N, step)
 interval_ms = dt * step * 1000
 
+# Create animation
 ani = FuncAnimation(fig, update, frames=frames, init_func=init,
                     blit=True, interval=interval_ms)
 
