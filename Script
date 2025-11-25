@@ -39,13 +39,13 @@ T_total = T1 + Th1 + T2 + Th2
 
 ## Simulation parameters
 dt = 0.01 
-N = int(T_total / dt) + 1
-time = np.linspace(0, T_total, N)
+N = int(T_total / dt) + 1 
+time = np.linspace(0, T_total, N) 
 
 
 ## Functions
 def forward_kinematics(q):
-    # Returns end-effector position for joint angles
+    # Returns end effector position for joint angles
     q1, q2 = q
     x1 = L1 * np.cos(q1)
     y1 = L1 * np.sin(q1)
@@ -116,7 +116,7 @@ for i in range(N - 1):
     # No gravity for simplicity
     ddq = f
 
-    # Integrate
+    # Integrate 
     dq[i + 1, :] = dq[i, :] + ddq * dt
     q[i + 1, :] = q[i, :] + dq[i + 1, :] * dt
 
@@ -190,9 +190,8 @@ ax.set_ylim(-max_reach, max_reach)
 ax.set_title("2-Link Pick-and-Place")
 
 # Plot points for pick and place 
-ax.scatter(pick_xy[0], pick_xy[1], s=80, c='red', label='Pick target')
-ax.scatter(place_xy[0], place_xy[1], s=80, c='green', label='Place target')
-
+ax.scatter(pick_xy[0], pick_xy[1], s=80, c='red', label='Pick')
+ax.scatter(place_xy[0], place_xy[1], s=80, c='green', label='Place')
 # robot links and joints
 link_line, = ax.plot([], [], '-o', lw=3)
 ax.legend(loc='upper right')
